@@ -1,6 +1,6 @@
 from pathlib import Path
 import pandas as pd
-
+from datetime import datetime
 
 RAW_DATA_PATH = Path("data/raw")
 
@@ -21,8 +21,13 @@ def read_csv_files():
     for file_path in csv_files:
         try:
             df = pd.read_csv(file_path, sep=";", encoding="utf-8-sig")
+
+            df["source_file"] = file_path.name
+            df["loaded_at"] = datetime.now()
+
             print(f"Read {file_path.name} - {len(df)} rows")
             dataframes.append(df)
+
         except Exception as e:
             print(f"Could not read {file_path.name}: {e}")
     
@@ -38,6 +43,4 @@ if __name__ == "__main__":
 
     if df is not None:
         print(df.head())
-        #print(f"\nTotal rows: {len(df)}")
-        print(f"Total rows: {len(df)}")
-        
+        print(f"\nTotal rows: {len(df)}")
