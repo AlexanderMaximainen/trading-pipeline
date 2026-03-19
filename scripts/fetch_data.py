@@ -4,13 +4,14 @@ from datetime import datetime
 
 RAW_DATA_PATH = Path("data/raw")
 
-def read_csv_files():
+def read_csv_files(csv_files=None):
     """Read all CSV files from data/raw and return one combined dataframe"""
     if not RAW_DATA_PATH.exists():
         print("Directory data/raw does not exist")
         return None
     
-    csv_files = sorted(RAW_DATA_PATH.glob("*.csv"))
+    if csv_files is None:
+        csv_files = sorted(RAW_DATA_PATH.glob("*.csv"))
 
     if not csv_files:
         print("No CSV files found in data/raw")
