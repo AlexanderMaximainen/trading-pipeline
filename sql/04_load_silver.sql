@@ -3,6 +3,7 @@ GO
 
 INSERT INTO silver.fact_transactions 
 (
+    bronze_raw_id,
     transaction_date,
     account,
     transaction_type,
@@ -20,6 +21,7 @@ INSERT INTO silver.fact_transactions
     loaded_at
 )
 SELECT
+    b.raw_id,
     TRY_CONVERT(DATE, [Datum]) AS transaction_date,
     [Konto] AS account,
     [Typ av transaktion] AS transaction_type,
@@ -35,7 +37,11 @@ SELECT
     TRY_CONVERT(DECIMAL(18,2), REPLACE([Resultat], ',', '.')) AS result,
     [source_file],
     [loaded_at]
-FROM bronze.transactions;
+FROM bronze.transactions b
+WHERE NOT EXISTS
+(
+    SELECT 1
+    FROM silver.fact_transactions s
+    WHERE s.bronze_raw_id = b.raw_id
+);
 GO
-
-select * from silver.fact_transactions;

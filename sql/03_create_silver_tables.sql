@@ -4,9 +4,10 @@ GO
 CREATE TABLE silver.fact_transactions 
 (
     transaction_id INT IDENTITY(1,1) PRIMARY KEY,
+    bronze_raw_id INT NOT NULL,
     transaction_date DATE NOT NULL,
-    account NVARCHAR(20) NOT NULL,
-    transaction_type NVARCHAR(20) NOT NULL,
+    account NVARCHAR(50) NOT NULL,
+    transaction_type NVARCHAR(50) NOT NULL,
     instrument_name NVARCHAR(255) NOT NULL,
     quantity DECIMAL(18,4),
     price DECIMAL(18,6),
@@ -21,3 +22,6 @@ CREATE TABLE silver.fact_transactions
     loaded_at DATETIME2(3) NOT NULL
 );
 GO
+
+CREATE INDEX idx_fact_transactions_bronze_raw_id
+    ON silver.fact_transactions(bronze_raw_id);
