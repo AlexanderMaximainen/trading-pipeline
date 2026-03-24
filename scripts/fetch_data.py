@@ -2,12 +2,13 @@ from pathlib import Path
 import pandas as pd
 from datetime import datetime
 
-RAW_DATA_PATH = Path("data/raw")
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+RAW_DATA_PATH = PROJECT_ROOT / "data" / "raw"
 
 def read_csv_files(csv_files=None):
     """Read all CSV files from data/raw and return one combined dataframe"""
     if not RAW_DATA_PATH.exists():
-        print("Directory data/raw does not exist")
+        print(f"Directory does not exist: {RAW_DATA_PATH}")
         return None
     
     if csv_files is None:
