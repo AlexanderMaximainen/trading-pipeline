@@ -16,6 +16,26 @@ CREATE TABLE silver.dim_instrument
 );
 GO
 
+CREATE TABLE silver.dim_date
+(
+	date_id INT NOT NULL,
+	[date] DATE NOT NULL, 
+    [year] SMALLINT NOT NULL,
+	[month] TINYINT NOT NULL,
+	[month_name] NVARCHAR(20) NOT NULL,
+    [weekday] TINYINT NOT NULL,
+	weekday_name NVARCHAR(20) NOT NULL,
+    [week] TINYINT NOT NULL,
+	[day] TINYINT NOT NULL,
+    [quarter] TINYINT NOT NULL,
+	quarter_name CHAR(2) NOT NULL,
+    year_month VARCHAR(7) NOT NULL,
+
+	CONSTRAINT PK_dim_date PRIMARY KEY (date_id),
+	CONSTRAINT UQ_dim_date_date UNIQUE ([date])
+);
+GO
+
 CREATE TABLE silver.fact_trades 
 (
     trade_id INT IDENTITY(1,1) PRIMARY KEY,

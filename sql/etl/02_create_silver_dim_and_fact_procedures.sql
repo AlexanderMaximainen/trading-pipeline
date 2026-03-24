@@ -123,9 +123,72 @@ BEGIN
 END;
 GO
 
+-------------------------------------------------------------------------------------------------
+-- Stored procedure for dim_date load
+-- Populates dim_date with one row per day for a predefined date range
+-- Includes date attributes for Power BI hierarchy and filtering
+-- This is not an incremental load. Run once and only rerun when date range needs to be extended
+-------------------------------------------------------------------------------------------------
+
+CREATE OR ALTER PROCEDURE silver.usp_load_dim_date
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET DATEFIRST 1;
+
+    DECLARE @start_date DATE = '2025-01-01';
+    DECLARE @end_date   DATE = '2030-12-31';
+
+    WITH dates AS
+    (
+        SELECT @start_date AS d
+        UNION ALL
+        SELECT DATEADD(DAY, 1, d)
+        FROM dates
+        WHERE d < @end_date
+    )
+    INSERT INTO silver.dim_date
+    (
+        date_id,
+        [date],
+        [year],
+        [month],
+        month_name,
+        [weekday],
+        weekday_name,
+        [week],
+        [day],
+        [quarter],
+        quarter_name,
+        year_month
+    )
+    SELECT
+        CONVERT(INT, CONVERT(CHAR(8), d, 112)) AS date_id,
+        d AS [date],
+        YEAR(d) AS [year],
+        MONTH(d) AS [month],
+        DATENAME(MONTH, d) AS month_name,
+        DATEPART(WEEKDAY, d) AS [weekday],
+        DATENAME(WEEKDAY, d) AS weekday_name,
+        DATEPART(WEEK, d) AS [week],
+        DAY(d) AS [day],
+        DATEPART(QUARTER, d) AS [quarter],
+        CONCAT('Q', DATEPART(QUARTER, d)) AS quarter_name,
+        CONVERT(CHAR(7), d, 126) AS year_month
+    FROM dates
+    WHERE NOT EXISTS
+    (
+        SELECT 1
+        FROM silver.dim_date dd
+        WHERE dd.[date] = d
+    )
+    OPTION (MAXRECURSION 0);
+END;   
+GO
+
 -----------------------------------------------------------------
 -- Stored procedure for fact_trades load
--- Loads trade transactions from silver staing into fact_trades
+-- Loads trade transactions from silver staging into fact_trades
 -- Filters for BUY/SELL (Köp/Sälj) transactions only
 -- Applies incremental load by using bronze_raw_id
 -----------------------------------------------------------------
@@ -224,19 +287,3 @@ BEGIN
         );
 END;
 GO
-        
-
-exec silver.usp_load_dim_instrument
-exec.silver.usp_load_fact_cash_movements
-exec silver.usp_load_fact_trades
-
-select * from silver.dim_instrument;
-select count(*) from silver.dim_instrument;
-
-select * from silver.fact_trades;
-select count(*) from silver.fact_trades;
-
-select * from silver.fact_cash_movements;
-select count(*) from silver.fact_cash_movements;
-
-select * from silver.stg_transactions;
