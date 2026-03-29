@@ -202,7 +202,7 @@ BEGIN
     (
         bronze_raw_id,
         instrument_id,
-        transaction_date,
+        date_id,
         account,
         trade_type,
         quantity,
@@ -217,8 +217,8 @@ BEGIN
     )
     SELECT
         s.bronze_raw_id,
-        d.instrument_id,
-        s.transaction_date,
+        i.instrument_id,
+        d.date_id,
         s.account,
         s.transaction_type AS trade_type,
         s.quantity,
@@ -231,8 +231,10 @@ BEGIN
         s.source_file,
         s.loaded_at
     FROM silver.stg_transactions s
-    JOIN silver.dim_instrument d
-        ON d.isin = s.isin
+    JOIN silver.dim_instrument i
+        ON i.isin = s.isin
+    JOIN silver.dim_date d
+        ON s.transaction_date = d.[date]
     WHERE s.transaction_type IN (N'Köp', N'Sälj')
         AND NOT EXISTS
         (
@@ -258,7 +260,7 @@ BEGIN
     INSERT INTO silver.fact_cash_movements
     (
         bronze_raw_id,
-        transaction_date,
+        date_id,
         account,
         cash_movement_type,
         [description],
@@ -269,7 +271,7 @@ BEGIN
     )
     SELECT
         s.bronze_raw_id,
-        s.transaction_date,
+        d.date_id,
         s.account,
         s.transaction_type AS cash_movement_type,
         s.instrument_name AS [description],
@@ -278,6 +280,8 @@ BEGIN
         s.source_file,
         s.loaded_at
     FROM silver.stg_transactions s
+    JOIN silver.dim_date d
+        ON s.transaction_date = d.[date]
     WHERE s.transaction_type NOT IN (N'Köp', N'Sälj')
         AND NOT EXISTS
         (

@@ -41,7 +41,7 @@ CREATE TABLE silver.fact_trades
     trade_id INT IDENTITY(1,1) PRIMARY KEY,
     bronze_raw_id INT NOT NULL,
     instrument_id INT NOT NULL,
-    transaction_date DATE NOT NULL,
+    date_id INT NOT NULL,
     account NVARCHAR(50) NOT NULL,
     trade_type NVARCHAR(10) NOT NULL,
     quantity INT,
@@ -57,42 +57,44 @@ CREATE TABLE silver.fact_trades
     CONSTRAINT FK_fact_trades_dim_instrument FOREIGN KEY (instrument_id)
         REFERENCES silver.dim_instrument (instrument_id),
 
-    CONSTRAINT chk_fact_trades_trade_type
-        CHECK (trade_type IN ('Köp', 'Sälj'))
-);
-GO
+    CONSTRAINT FK_fact_trades_dim_date FOREIGN KEY (date_id)
+        REFERENCES silver.dim_date (date_id),
 
-CREATE INDEX idx_fact_trades_bronze_raw_id
-    ON silver.fact_trades (bronze_raw_id);
+    CONSTRAINT UQ_fact_trades_bronze_raw_id UNIQUE (bronze_raw_id),
+       
+    CONSTRAINT chk_fact_trades_trade_type
+        CHECK (trade_type IN (N'Köp', N'Sälj'))
+);
 GO
 
 CREATE INDEX idx_fact_trades_instrument_id
     ON silver.fact_trades (instrument_id);
 GO
 
-CREATE INDEX idx_fact_trades_transaction_date
-    ON silver.fact_trades (transaction_date);
+CREATE INDEX idx_fact_trades_date_id
+    ON silver.fact_trades (date_id);
 GO
 
 CREATE TABLE silver.fact_cash_movements
 (
     cash_movement_id INT IDENTITY(1,1) PRIMARY KEY,
     bronze_raw_id INT NOT NULL,
-    transaction_date DATE NOT NULL,
+    date_id INT NOT NULL,
     account NVARCHAR(50) NOT NULL,
     cash_movement_type NVARCHAR(50) NOT NULL,
     [description] NVARCHAR(100),
     amount DECIMAL(10,2) NOT NULL,
     transaction_currency CHAR(3),
     source_file NVARCHAR(255) NOT NULL,
-    loaded_at DATETIME2(3) NOT NULL
+    loaded_at DATETIME2(3) NOT NULL,
+
+    CONSTRAINT FK_fact_cash_movements_dim_date FOREIGN KEY (date_id)
+        REFERENCES silver.dim_date (date_id),
+
+    CONSTRAINT UQ_fact_cash_movements_bronze_raw_id UNIQUE (bronze_raw_id)
 );
 GO
 
-CREATE INDEX idx_fact_cash_movements_bronze_raw_id
-    ON silver.fact_cash_movements (bronze_raw_id);
-GO
-
-CREATE INDEX idx_fact_cash_movements_transaction_date
-    ON silver.fact_cash_movements (transaction_date);
+CREATE INDEX idx_fact_cash_movements_date_id
+    ON silver.fact_cash_movements (date_id);
 GO

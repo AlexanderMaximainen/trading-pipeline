@@ -11,14 +11,16 @@ CREATE OR ALTER VIEW gold.v_daily_pnl AS
 WITH daily AS 
 (
     SELECT
-        transaction_date AS trade_date,
+        d.[date] AS trade_date,
         COUNT(*) AS total_sells,
-        ROUND(SUM(result), 2) AS daily_pnl,
-        ROUND(SUM(COALESCE(fee, 0)), 2) AS daily_fees
-    FROM silver.fact_trades
-    WHERE trade_type = N'Sälj'
-      AND result IS NOT NULL
-    GROUP BY transaction_date
+        ROUND(SUM(f.result), 2) AS daily_pnl,
+        ROUND(SUM(COALESCE(f.fee, 0)), 2) AS daily_fees
+    FROM silver.fact_trades f
+    JOIN silver.dim_date d
+        ON f.date_id = d.date_id
+    WHERE f.trade_type = N'Sälj'
+      AND f.result IS NOT NULL
+    GROUP BY d.[date]
 )
 SELECT
     trade_date,
@@ -43,15 +45,17 @@ CREATE OR ALTER VIEW gold.v_monthly_pnl AS
 WITH monthly AS
 (
     SELECT
-        DATEFROMPARTS(YEAR(transaction_date), MONTH(transaction_date), 1) AS month_start,
+        DATEFROMPARTS(d.[year], d.[month], 1) AS month_start,
         COUNT(*) AS total_sells,
-        ROUND(SUM(result), 2) AS monthly_pnl,
-        ROUND(SUM(COALESCE(fee, 0)), 2) AS monthly_fees
-    FROM silver.fact_trades
-    WHERE trade_type = N'Sälj'
-      AND result IS NOT NULL
+        ROUND(SUM(f.result), 2) AS monthly_pnl,
+        ROUND(SUM(COALESCE(f.fee, 0)), 2) AS monthly_fees
+    FROM silver.fact_trades f
+    JOIN silver.dim_date d
+        ON f.date_id = d.date_id
+    WHERE f.trade_type = N'Sälj'
+      AND f.result IS NOT NULL
     GROUP BY
-        DATEFROMPARTS(YEAR(transaction_date), MONTH(transaction_date), 1)
+        DATEFROMPARTS(d.[year], d.[month], 1)
 )
 SELECT
     month_start,
@@ -77,26 +81,34 @@ GO
 
 CREATE OR ALTER VIEW gold.v_pnl_by_instrument AS
 SELECT
-    COALESCE(d.instrument_group, d.instrument_name, 'Unknown') AS instrument,
-    d.underlying_asset,
-    d.direction,
+    COALESCE(i.instrument_group, i.instrument_name, 'Unknown') AS instrument,
+    i.underlying_asset,
+    i.direction,
     f.transaction_currency AS currency,
     COUNT(*) AS total_sells,
     ROUND(SUM(f.result), 2) AS total_pnl,
     ROUND(SUM(CASE WHEN f.result > 0 THEN f.result ELSE 0 END), 2) AS gross_profit,
     ROUND(ABS(SUM(CASE WHEN f.result < 0 THEN f.result ELSE 0 END)), 2) AS gross_loss,
     ROUND(SUM(COALESCE(f.fee, 0)), 2) AS total_fees,
-    MIN(f.transaction_date) AS first_trade_date,
-    MAX(f.transaction_date) AS last_trade_date
+    CAST(
+        ROUND(
+            100.0 * SUM(CASE WHEN f.result > 0 THEN 1 ELSE 0 END) / COUNT(*),
+            2
+        ) AS DECIMAL(5,2) 
+    ) AS win_rate_pct,
+    MIN(d.[date]) AS first_trade_date,
+    MAX(d.[date]) AS last_trade_date
 FROM silver.fact_trades f
-LEFT JOIN silver.dim_instrument d
-    ON f.instrument_id = d.instrument_id
+JOIN silver.dim_date d
+    ON f.date_id = d.date_id
+LEFT JOIN silver.dim_instrument i
+    ON f.instrument_id = i.instrument_id
 WHERE f.trade_type = N'Sälj'
   AND f.result IS NOT NULL
 GROUP BY
-    COALESCE(d.instrument_group, d.instrument_name, 'Unknown'),
-    d.underlying_asset,
-    d.direction,
+    COALESCE(i.instrument_group, i.instrument_name, 'Unknown'),
+    i.underlying_asset,
+    i.direction,
     f.transaction_currency;
 GO
 ------------------------------------------------------------------------------------
@@ -157,23 +169,25 @@ GROUP BY
     COALESCE(d.direction, 'Unknown');
 GO
 
----------------------------------------------------------------------------------------
+----------------------------------------------------------------
 -- 6. Monthly cash flow
 --    Aggregates non-trade cash movements per month
 --    Gives an overview of capital inflow and outflow over time
----------------------------------------------------------------------------------------
+----------------------------------------------------------------
 
 CREATE OR ALTER VIEW gold.v_monthly_cash_flow AS
 WITH monthly AS
 (
     SELECT
-        DATEFROMPARTS(YEAR(transaction_date), MONTH(transaction_date), 1) AS month_start,
-        cash_movement_type,
-        ROUND(SUM(amount), 2) AS monthly_amount
-    FROM silver.fact_cash_movements
+        DATEFROMPARTS(d.[year], d.[month], 1) AS month_start,
+        c.cash_movement_type,
+        ROUND(SUM(c.amount), 2) AS monthly_amount
+    FROM silver.fact_cash_movements c
+    JOIN silver.dim_date d
+        ON c.date_id = d.date_id
     GROUP BY
-        DATEFROMPARTS(YEAR(transaction_date), MONTH(transaction_date), 1),
-        cash_movement_type
+        DATEFROMPARTS(d.[year], d.[month], 1),
+        c.cash_movement_type
 )
 SELECT
     month_start,
@@ -181,4 +195,25 @@ SELECT
     cash_movement_type,
     monthly_amount
 FROM monthly;
+GO
+
+---------------------------------------------------------------------------------------
+-- 7. Unclassified instruments
+--    Shows instruments that have missing classification values in dim_instrument
+--    Useful for checking which mappings need to be added
+---------------------------------------------------------------------------------------
+
+CREATE OR ALTER VIEW gold.v_unclassified_instruments AS
+SELECT
+    isin,
+    instrument_name,
+    instrument_group,
+    underlying_asset,
+    direction,
+    issuer
+FROM silver.dim_instrument
+WHERE instrument_group IS NULL
+    OR underlying_asset IS NULL
+    OR direction IS NULL
+    OR issuer IS NULL;
 GO
